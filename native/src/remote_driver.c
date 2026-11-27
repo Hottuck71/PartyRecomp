@@ -361,7 +361,7 @@ static u32 take_joycon(Driver* d, RemoteSample* out, u32 max, s32* plug) {
     if (recentre) motion_pointer_recentre();
     for (u32 i = 0; i < n; i++) {
         u8 r[REMOTE_REPORT_SIZE];
-        joycon_make_report(&out[i], r);
+        joycon_pointer_report(joycon_of(d->slot), i, &out[i], r);
         choose_dots(d, r, when[i], &out[i]);
         d->samples++;
     }
