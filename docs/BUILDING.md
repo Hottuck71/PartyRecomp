@@ -2,7 +2,7 @@
 
 > PartyRecomp's toolkit is ResortRecomp's, with this repository's runtime and launcher. Build the base toolkit as
 > below (the scripts still call it ResortRecomp), then with it in a folder, `scripts\build_launcher.ps1 -Toolkit
-> <folder> -ImGui <imgui> -Sdl <SDL>` builds PartyRecomp's `Launcher.exe` and `PairRemote.exe` and copies the
+> <folder> -ImGui <imgui> -Sdl <SDL>` builds PartyRecomp's `Launcher.exe`, `PairRemote.exe` and `PairJoyCon.exe` and copies the
 > runtime (`native\src`, `native\replacements.txt`, `native\builder\game.mk`, `native\include`) into it, and
 > `scripts\make_release.ps1 -Toolkit <folder>` makes the release zip and the Setup exe from it, checking that
 > nothing personal or from the game is inside. The scripts for building by hand from a disc image: `unlz11.py`,
@@ -33,7 +33,7 @@ powershell -ExecutionPolicy Bypass -File scripts\build-toolkit.ps1 -Version 1.0.
 
 1. `scripts\45_make_nand.py` writes the console-settings files new saves start from, from public formats.
 2. `scripts\48_build_aurora.ps1` applies `native\patches\aurora-*.patch` and builds aurora.
-3. `scripts\41_build_native.ps1 -Target toolkit-parts` builds `Launcher.exe`, `PairRemote.exe`, and the graphics
+3. `scripts\41_build_native.ps1 -Target toolkit-parts` builds `Launcher.exe`, `PairRemote.exe`, `PairJoyCon.exe`, and the graphics
    glue (`native\src\aurora_glue.cpp`).
 4. `scripts\66_make_toolkit.ps1` builds DolRecomp with GCC (with `native\patches\dolrecomp-direct-calls.patch`),
    copies the runtime's C source, the prebuilt graphics library, the GCC toolchain from MSYS2, the relay, and

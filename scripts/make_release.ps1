@@ -24,7 +24,7 @@ if (Test-Path $out) { Remove-Item -LiteralPath $out -Recurse -Force }
 New-Item -ItemType Directory -Force $stage | Out-Null
 
 # 1. The release's files, from the list.
-$files = @('Launcher.exe', 'PairRemote.exe', 'README.txt') + (Get-ChildItem $Toolkit -Filter *.dll | ForEach-Object Name)
+$files = @('Launcher.exe', 'PairRemote.exe', 'PairJoyCon.exe', 'README.txt') + (Get-ChildItem $Toolkit -Filter *.dll | ForEach-Object Name)
 foreach ($f in $files) { Copy-Item (Join-Path $Toolkit $f) $stage }
 foreach ($d in 'builder', 'relay', 'licenses', 'nand-template') { Copy-Item (Join-Path $Toolkit $d) $stage -Recurse }
 Set-Content (Join-Path $stage 'release.txt') "PartyRecomp $Version. This file keeps the launcher's save, build, and reports inside this folder. Don't delete it." -Encoding ascii

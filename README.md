@@ -40,8 +40,9 @@ the keyboard and mouse always play as player 1 too.
 - **Gamepads** (Xbox, PlayStation, Switch Pro and others, through SDL3): A = A, B or right trigger = B, X = 1,
   Y = 2, Start = +, Back = −, Guide = HOME, d-pad or left stick = d-pad, right stick = pointer (click to centre),
   left bumper = shake, left trigger + left stick = tilt. A pad with a gyro also points and moves for real.
-- **Nintendo Switch Joy-Cons**, each one a Wii Remote Plus of its own: pair them with Windows once (hold the sync
-  button on the rail, then **Settings > Bluetooth & devices > Add device**) and they take seats as they connect,
+- **Nintendo Switch Joy-Cons**, each one a Wii Remote Plus of its own: pair them once on the launcher's **Joy-Con** tab
+  (its own tab, apart from the Wii Remote one: hold the sync button on the rail until the lights move, then click
+  **The lights are moving**; it also tests them) and they take seats as they connect,
   after any Wii Remotes. Their gyro and accelerometer are the remote's MotionPlus and motion, so they point (no
   sensor bar) and shake like a Wii Remote; rumble and player lights work. Held upright, top towards the screen:
   right Joy-Con A = A, ZR = B, stick = d-pad, Y = 1, B = 2, X = −, + = +; left Joy-Con right arrow = A, ZL = B,
