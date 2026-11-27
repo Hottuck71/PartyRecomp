@@ -327,6 +327,9 @@ static Report* new_report(u32 id) {
     memset(r->data, 0, REPORT_SIZE);
     r->data[0] = (u8)id;
     u32 buttons = R->current.buttons | R->live.buttons;
+    /* A remote or Joy-Con replayed from samples: every report carries what it holds now, so a held button
+       stays held through the status and acknowledgement reports between its samples (rumble sends many). */
+    if (R->raw) buttons |= R->latest.buttons;
     r->data[1] = (u8)(buttons >> 8);
     r->data[2] = (u8)buttons;
     return r;
@@ -909,6 +912,7 @@ static void dress_seat(u32 player) {
         R->raw = 1;
     }
     R->pending_head = R->pending_tail = 0;
+    memset(&R->latest, 0, sizeof R->latest);
     R->last_gyro_flags = 0;
     plain_extension_registers();
     if (R->connected) R->reconnect = 1;
