@@ -51,6 +51,18 @@ needed with a Wii Remote Plus or a MotionPlus: its gyro points. Hold it still
 for a moment after it connects, then point at the middle of the screen and
 press A to centre it. C re-centres, F9 / F10 flip left-right / up-down.
 
+Nintendo Switch Joy-Cons: pair them once (Launcher > Joy-Con tab: hold the
+sync button on the rail until the lights move, then click "The lights are
+moving"). Each Joy-Con is a Wii Remote of its own, seated after Wii Remotes
+and before gamepads, and points with its gyro. Held upright, top towards the
+screen:
+  Right Joy-Con: A = A, ZR = B, stick = d-pad, Y = 1, B = 2, X = -, + = +
+  Left Joy-Con:  right arrow = A, ZL = B, stick = d-pad, left arrow = 1,
+                 down arrow = 2, up arrow = +, - = -, Capture = HOME
+  R / L or pressing the stick re-centres the pointer.
+SL and SR together switch a Joy-Con to sideways (stick on the left): bottom
+button = 2, right = 1, left = A, top = B, SL = -, SR = +.
+
 Gamepads (Xbox, PlayStation, Switch Pro and others):
   A (bottom) = A          B (right) or right trigger = B
   X (left)   = 1          Y (top) = 2
@@ -96,6 +108,7 @@ WHAT'S IN THIS FOLDER
 ---------------------
 Launcher.exe            the launcher
 PairRemote.exe          pairs a Wii Remote with Windows
+PairJoyCon.exe          pairs Nintendo Switch Joy-Cons with Windows
 builder\                the translator (DolRecomp), the runtime as source,
                         the graphics library, and a C compiler (GCC)
 relay\                  the online room server, and how to run it
