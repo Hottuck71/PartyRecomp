@@ -84,6 +84,9 @@ static void open_new_pads(void) {
         for (int s = 0; s < GAMEPAD_SLOTS && slot < 0; s++)
             if (!pads[s].pad) slot = s;
         if (slot < 0) break;
+        if (SDL_GetGamepadVendorForID(ids[i]) == 0x057E &&
+            (SDL_GetGamepadProductForID(ids[i]) == 0x2006 || SDL_GetGamepadProductForID(ids[i]) == 0x2007))
+            continue; /* a Joy-Con: joycon.c drives it as a Wii Remote */
         SDL_Gamepad* g = SDL_OpenGamepad(ids[i]);
         if (!g) continue;
         Pad* p = &pads[slot];

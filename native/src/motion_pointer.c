@@ -61,7 +61,7 @@ typedef struct {
     u32 still, steady, samples, rejected, still_samples, recentres, relearns, logged;
 } MotionPointer;
 #define MP_INIT {.zero = {GYRO_ZERO, GYRO_ZERO, GYRO_ZERO}, .pitch_sign = 1.0f, .yaw_sign = 1.0f, .dt = SAMPLE_SECONDS}
-static MotionPointer mps[MOTION_POINTER_SLOTS] = {MP_INIT, MP_INIT, MP_INIT, MP_INIT};
+static MotionPointer mps[MOTION_POINTER_SLOTS] = {MP_INIT, MP_INIT, MP_INIT, MP_INIT, MP_INIT, MP_INIT, MP_INIT, MP_INIT};
 static MotionPointer* const cur_mp = &mps[0];
 #define mp (*cur_mp)
 #define SLOT(s) MotionPointer* cur_mp = &mps[(unsigned)(s) % MOTION_POINTER_SLOTS]

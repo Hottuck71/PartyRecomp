@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include "fake_remote.h"
 
-#define REMOTE_DRIVER_SLOTS 4
+#define REMOTE_DRIVER_WII_SLOTS 4 /* slots 0 to 3: real Wii Remotes */
+#define REMOTE_DRIVER_SLOTS 8     /* slots 4 to 7: Joy-Cons (joycon.c) standing in for Wii Remotes */
 
 /* Online: starts talking to the first remote (real_remote.c, or its simulator with --sim-real-remote) and waits up
    to wait_ms for one to answer and be set up: MotionPlus on, the Nunchuk if there is one, calibration read,

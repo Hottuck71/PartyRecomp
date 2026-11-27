@@ -1,7 +1,7 @@
 # PartyRecomp
 
 Play **your own copy** of Wii Party on a Windows 10 or 11 PC, as a native PC program: real Wii Remotes (pointing
-without a sensor bar), gamepads, up to four players, online play with friends, and an optional 60 fps mode.
+without a sensor bar), Nintendo Switch Joy-Cons, gamepads, up to four players, online play with friends, and an optional 60 fps mode.
 
 By **Lane Carle (crazyman12)**. Built on [ResortRecomp](https://github.com/Hottuck71/ResortRecomp), the same
 launcher and runtime made for Wii Sports Resort.
@@ -40,6 +40,14 @@ the keyboard and mouse always play as player 1 too.
 - **Gamepads** (Xbox, PlayStation, Switch Pro and others, through SDL3): A = A, B or right trigger = B, X = 1,
   Y = 2, Start = +, Back = −, Guide = HOME, d-pad or left stick = d-pad, right stick = pointer (click to centre),
   left bumper = shake, left trigger + left stick = tilt. A pad with a gyro also points and moves for real.
+- **Nintendo Switch Joy-Cons**, each one a Wii Remote Plus of its own: pair them with Windows once (hold the sync
+  button on the rail, then **Settings > Bluetooth & devices > Add device**) and they take seats as they connect,
+  after any Wii Remotes. Their gyro and accelerometer are the remote's MotionPlus and motion, so they point (no
+  sensor bar) and shake like a Wii Remote; rumble and player lights work. Held upright, top towards the screen:
+  right Joy-Con A = A, ZR = B, stick = d-pad, Y = 1, B = 2, X = −, + = +; left Joy-Con right arrow = A, ZL = B,
+  stick = d-pad, left arrow = 1, down arrow = 2, up arrow = +, − = −, Capture = HOME. R/L or pressing the stick
+  re-centres the pointer. For sideways games, press **SL and SR together** to hold it sideways (stick on the left):
+  bottom button = 2, right = 1, left = A, top = B, SL = −, SR = +.
 
 ## 60 fps (off by default)
 

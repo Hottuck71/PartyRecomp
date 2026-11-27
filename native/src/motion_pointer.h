@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include "host.h"
 
-#define MOTION_POINTER_SLOTS 4 /* one for each real remote; the functions without _at are the first one's */
+#define MOTION_POINTER_SLOTS 8 /* one for each remote driver slot (Wii Remotes, then Joy-Cons); without _at, the first */
 
 void motion_pointer_feed(const u8* report, double seconds); /* every data report from the real remote, and when it came */
 int motion_pointer_get(float* x, float* y);  /* window units, -1 to 1; returns 1 while it is on the screen */

@@ -16,13 +16,18 @@
    Each remote has its own thread, so Bluetooth waits never hold up the game or each other. A Nunchuk plugged in
    or out later is seen in the MotionPlus data's extension bit, and MotionPlus is switched over to match. With no
    sensor bar, the dots come from that remote's MotionPlus pointer (motion_pointer.c), or for the first remote
-   from the mouse while it moves. The functions without _at are slot 0's. */
+   from the mouse while it moves. The functions without _at are slot 0's.
+
+   Slots 4 to 7 are Joy-Cons (joycon.c): each gives samples as a Wii Remote Plus would, with a fixed calibration,
+   and gets the same MotionPlus pointer, so a seat takes a Joy-Con just as it takes a Wii Remote. Online, a Joy-Con
+   plays when no Wii Remote is connected. */
 #include <windows.h>
 #include <math.h>
 #include <string.h>
 #include "remote_driver.h"
 #include "motion_pointer.h"
 #include "real_remote.h"
+#include "joycon.h"
 
 #define STEP_WAIT_MS 700u
 #define QUEUE 128u
@@ -45,6 +50,10 @@ typedef struct {
 
 static Driver drivers[REMOTE_DRIVER_SLOTS];
 static int started;
+static int online_slot; /* online: this PC's remote, slot 0, or the first Joy-Con's slot when no Wii Remote is there */
+
+static int is_joycon(int slot) { return (int)((unsigned)slot % REMOTE_DRIVER_SLOTS) >= REMOTE_DRIVER_WII_SLOTS; }
+static int joycon_of(int slot) { return (int)((unsigned)slot % REMOTE_DRIVER_SLOTS) - REMOTE_DRIVER_WII_SLOTS; }
 
 static Driver* driver_at(int slot) { return &drivers[(unsigned)slot % REMOTE_DRIVER_SLOTS]; }
 
@@ -343,6 +352,32 @@ static DWORD WINAPI run(void* arg) {
     return 0;
 }
 
+/* A Joy-Con's samples, with sensor bar dots from its MotionPlus pointer as for a real remote with no sensor bar. */
+static u32 take_joycon(Driver* d, RemoteSample* out, u32 max, s32* plug) {
+    double when[64];
+    int recentre = 0;
+    if (max > 64) max = 64;
+    u32 n = joycon_take_at(joycon_of(d->slot), out, when, max, plug, &recentre);
+    if (recentre) motion_pointer_recentre();
+    for (u32 i = 0; i < n; i++) {
+        u8 r[REMOTE_REPORT_SIZE];
+        joycon_make_report(&out[i], r);
+        choose_dots(d, r, when[i], &out[i]);
+        d->samples++;
+    }
+    return n;
+}
+
+static void start_joycons(void) {
+    for (int s = REMOTE_DRIVER_WII_SLOTS; s < REMOTE_DRIVER_SLOTS; s++) {
+        Driver* d = &drivers[s];
+        d->slot = s;
+        d->motion_plus = 1; /* a Joy-Con's gyro is its MotionPlus */
+        d->plug_event = -1;
+    }
+    joycon_start(0); /* every Joy-Con a remote of its own */
+}
+
 static void start_driver(int slot) {
     Driver* d = &drivers[slot];
     d->slot = slot;
@@ -357,10 +392,21 @@ int remote_driver_start(u32 wait_ms, int simulated, int sim_nunchuk) {
     if (simulated) real_remote_start_simulated(sim_nunchuk);
     else real_remote_start();
     if (!started) start_driver(0);
+    if (!started && !simulated) start_joycons();
     started = 1;
     DWORD until = GetTickCount() + wait_ms;
-    while (!drivers[0].ready && (LONG)(until - GetTickCount()) > 0) Sleep(20);
-    if (!drivers[0].ready) fprintf(report, "Remote driver: no Wii Remote ready within %u ms; the keyboard plays\n", wait_ms);
+    /* A Joy-Con plays only if no Wii Remote is connected: a connected one is waited for. */
+    while (!drivers[0].ready && (LONG)(until - GetTickCount()) > 0) {
+        if (!simulated && joycon_ready_at(0) && !real_remote_connected()) break;
+        Sleep(20);
+    }
+    if (!drivers[0].ready && !simulated && joycon_ready_at(0)) {
+        online_slot = REMOTE_DRIVER_WII_SLOTS;
+        fprintf(report, "Remote driver: no Wii Remote; a Joy-Con plays\n");
+        return 1;
+    }
+    if (!drivers[0].ready)
+        fprintf(report, "Remote driver: no Wii Remote or Joy-Con ready within %u ms; the keyboard plays\n", wait_ms);
     return drivers[0].ready != 0;
 }
 
@@ -368,25 +414,35 @@ void remote_driver_start_all(int simulated) {
     if (started) return;
     if (simulated) real_remote_start_simulated(0);
     else real_remote_start();
-    for (int s = 0; s < REMOTE_DRIVER_SLOTS; s++) start_driver(s);
+    for (int s = 0; s < REMOTE_DRIVER_WII_SLOTS; s++) start_driver(s);
+    if (!simulated) start_joycons();
     started = 1;
 }
 
-int remote_driver_ready_at(int slot) { return started && driver_at(slot)->ready != 0; }
-int remote_driver_ready(void) { return remote_driver_ready_at(0); }
+int remote_driver_ready_at(int slot) {
+    if (!started) return 0;
+    if (is_joycon(slot)) return joycon_ready_at(joycon_of(slot));
+    return driver_at(slot)->ready != 0;
+}
+int remote_driver_ready(void) { return remote_driver_ready_at(online_slot); }
 
 void remote_driver_calibration_at(int slot, RemoteCalibration* out) {
     Driver* d = driver_at(slot);
+    if (started && is_joycon(slot)) {
+        joycon_calibration_at(joycon_of(slot), out);
+        return;
+    }
     if (started && d->ready) *out = d->cal;
     else memset(out, 0, sizeof *out);
 }
-void remote_driver_calibration(RemoteCalibration* out) { remote_driver_calibration_at(0, out); }
+void remote_driver_calibration(RemoteCalibration* out) { remote_driver_calibration_at(online_slot, out); }
 
 u32 remote_driver_take_at(int slot, RemoteSample* out, u32 max, s32* plug) {
     Driver* d = driver_at(slot);
     u32 n = 0;
     *plug = -1;
     if (!started) return 0;
+    if (is_joycon(slot)) return take_joycon(d, out, max, plug);
     *plug = InterlockedExchange(&d->plug_event, -1);
     if (!d->ready) return 0;
     EnterCriticalSection(&d->lock);
@@ -400,14 +456,18 @@ u32 remote_driver_take_at(int slot, RemoteSample* out, u32 max, s32* plug) {
     for (u32 i = 0; i < n; i++) out[i].offset = (u8)(i * FIELD_MS / n);
     return n;
 }
-u32 remote_driver_take(RemoteSample* out, u32 max, s32* plug) { return remote_driver_take_at(0, out, max, plug); }
+u32 remote_driver_take(RemoteSample* out, u32 max, s32* plug) { return remote_driver_take_at(online_slot, out, max, plug); }
 
 void remote_driver_output_at(int slot, u32 leds, int rumble) {
     Driver* d = driver_at(slot);
+    if (is_joycon(slot)) {
+        joycon_output_at(joycon_of(slot), leds, rumble);
+        return;
+    }
     InterlockedExchange(&d->wanted_leds, (LONG)(leds & 15u));
     InterlockedExchange(&d->wanted_rumble, rumble ? 1 : 0);
 }
-void remote_driver_output(u32 leds, int rumble) { remote_driver_output_at(0, leds, rumble); }
+void remote_driver_output(u32 leds, int rumble) { remote_driver_output_at(online_slot, leds, rumble); }
 
 void remote_driver_write_report(FILE* out) {
     for (int s = 0; s < REMOTE_DRIVER_SLOTS; s++) {
@@ -418,6 +478,7 @@ void remote_driver_write_report(FILE* out) {
                 s + 1, d->ready ? "ready" : "not ready", d->inits, d->samples, d->dropped, d->plugs, d->status_reports,
                 d->step_timeouts);
     }
+    joycon_write_report(out);
 }
 
 /* --test-remote-driver: sets up the simulated remote and checks what comes back. */

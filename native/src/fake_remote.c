@@ -912,9 +912,10 @@ static void dress_seat(u32 player) {
     R->last_gyro_flags = 0;
     plain_extension_registers();
     if (R->connected) R->reconnect = 1;
+    int joycon = real && seats[player].index >= REMOTE_DRIVER_WII_SLOTS;
     fprintf(report, "Player %u: %s %d at field %u\n", player + 1,
-            real ? "Wii Remote" : seats[player].kind == SEAT_PAD ? "gamepad" : "keyboard and mouse",
-            seats[player].index + 1, host_field());
+            joycon ? "Joy-Con" : real ? "Wii Remote" : seats[player].kind == SEAT_PAD ? "gamepad" : "keyboard and mouse",
+            seats[player].index + 1 - (joycon ? REMOTE_DRIVER_WII_SLOTS : 0), host_field());
     R = was;
 }
 
@@ -964,8 +965,10 @@ static void update_players(void) {
         int gone = (seat->kind == SEAT_REMOTE && !remote_driver_ready_at(seat->index)) ||
                    (seat->kind == SEAT_PAD && (!pads[seat->index].present || pads[seat->index].id != seat->pad_id));
         if (!gone) continue;
-        fprintf(report, "Player %u: %s %d left at field %u\n", p + 1, seat->kind == SEAT_REMOTE ? "Wii Remote" : "gamepad",
-                seat->index + 1, host_field());
+        int joycon = seat->kind == SEAT_REMOTE && seat->index >= REMOTE_DRIVER_WII_SLOTS;
+        fprintf(report, "Player %u: %s %d left at field %u\n", p + 1,
+                joycon ? "Joy-Con" : seat->kind == SEAT_REMOTE ? "Wii Remote" : "gamepad",
+                seat->index + 1 - (joycon ? REMOTE_DRIVER_WII_SLOTS : 0), host_field());
         seat->kind = SEAT_EMPTY;
         if (p == 0) dress_seat(0); /* player 1 goes back to the keyboard */
     }

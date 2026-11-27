@@ -17,6 +17,7 @@
 #include "net_status.h"
 #include "remote_driver.h"
 #include "gamepad.h"
+#include "joycon.h"
 #include "cache_check.h"
 #include <stdatomic.h>
 #include "rel.h"
@@ -1122,6 +1123,7 @@ int main(int argc, char** argv) {
        (both talking to one remote would fight over its report mode), and gamepads keep reporting while the
        window is behind another for a moment. */
     _putenv("SDL_JOYSTICK_HIDAPI_WII=0");
+    _putenv("SDL_JOYSTICK_HIDAPI_JOY_CONS=0"); /* and Joy-Cons joycon.c's */
     _putenv("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1");
     const char* game = "exports/disc/DATA";
     const char* report_path = "analysis/native/run.txt";
@@ -1180,6 +1182,7 @@ int main(int argc, char** argv) {
             extern int fast_nan_trace;
             fast_nan_trace = atoi(argv[i + 1]);
         }
+        else if (!strcmp(argv[i], "--test-joycon")) return joycon_self_test() ? 1 : 0; /* Joy-Con conversions, then exits */
         else if (!strcmp(argv[i], "--test-motion-pointer")) { /* checks motion_pointer.c, then exits */
             int motion_pointer_self_test(void);
             return motion_pointer_self_test() ? 1 : 0;
