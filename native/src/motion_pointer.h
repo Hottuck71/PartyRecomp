@@ -19,6 +19,10 @@ void motion_pointer_place_at(int slot, float x, float y);
 void motion_pointer_calibrate_at(int slot);
 /* A remote with no MotionPlus: a pointer from its tilt, given its raw accelerometer and its EEPROM calibration. */
 int motion_pointer_tilt_at(int slot, const u16 accel[3], const u8 cal[10], float* x, float* y);
+/* For a real remote's report with no sensor bar in view: the MotionPlus pointer, or the tilt one while no
+   MotionPlus data comes. Returns 1 while it is on the screen. */
+int motion_pointer_for_report(const u8* report, float* x, float* y);
+int motion_pointer_for_report_at(int slot, const u8* report, float* x, float* y);
 void motion_pointer_write_report(FILE* report);
 int motion_pointer_self_test(void);
 #endif

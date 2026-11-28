@@ -47,6 +47,7 @@
 #define SIGN_EVIDENCE 400.0f      /* how much agreement before up and down is settled */
 #define MAX_LOGGED 12u
 #define LEVEL_FOLLOW 0.1f          /* gravity for the roll check, eased over a few samples */
+#define GYRO_GONE_REPORTS 200u    /* about a second with no MotionPlus data: the game has it off, or there is none */
 #define ROLLED_DEGREES 40.0f       /* rolled further than this, it shows no dots (see motion_pointer_get) */
 #define SETTINGS "analysis/native/pointer-settings.txt"
 
@@ -62,6 +63,7 @@ typedef struct {
     int have_accel_pitch, have_mean, zero_known, flipped, flipped_y, loaded;
     float level[3]; /* the accelerometer, eased: which way is up */
     int have_level, rolled;
+    u32 reports, gyro_report; /* reports fed, and the last that carried MotionPlus data */
     u32 still, steady, samples, rejected, still_samples, recentres, relearns, logged;
 } MotionPointer;
 #define MP_INIT {.zero = {GYRO_ZERO, GYRO_ZERO, GYRO_ZERO}, .pitch_sign = 1.0f, .yaw_sign = 1.0f, .dt = SAMPLE_SECONDS}
@@ -117,6 +119,7 @@ static const u8* accel_of(const u8* r) {
 void motion_pointer_feed_at(int slot, const u8* report_bytes, double seconds) {
     SLOT(slot);
     if (!mp.loaded) load_settings(cur_mp);
+    mp.reports++;
     const u8* e = extension_of(report_bytes);
     if (!e) return;
     if ((e[5] & 3u) != 2u) { /* a passed-through Nunchuk's data, or not MotionPlus at all */
@@ -127,6 +130,7 @@ void motion_pointer_feed_at(int slot, const u8* report_bytes, double seconds) {
                     (float)(e[2] | ((e[5] >> 2) << 8))};
     int slow[3] = {(e[3] >> 1) & 1, (e[4] >> 1) & 1, e[3] & 1};
     mp.samples++;
+    mp.gyro_report = mp.reports;
 
     /* Time between samples, averaged, since reports can arrive in twos. A gap over 50 ms is a pause, not a rate. */
     if (mp.last_time > 0) {
@@ -214,12 +218,14 @@ void motion_pointer_feed_at(int slot, const u8* report_bytes, double seconds) {
     if (!mp.zero_known) return; /* with the zero unknown, any turn would come out wrong */
     mp.yaw += rate[0] * mp.dt * mp.yaw_sign;
     mp.pitch += rate[2] * mp.dt * mp.pitch_sign;
-    /* Not stopped at an edge: one that stopped while the remote turned on would point elsewhere than the remote
-       once it came back, and the game pulls its MotionPlus heading (a sword's, say) towards the pointer's dots. */
-    if (mp.yaw > 180.0f) mp.yaw -= 360.0f;
-    if (mp.yaw < -180.0f) mp.yaw += 360.0f;
-    if (mp.pitch > 90.0f) mp.pitch = 90.0f;
-    if (mp.pitch < -90.0f) mp.pitch = -90.0f;
+    /* Kept within reach of the screen, so gyro drift can't carry it off for good: turned on past the edge, it waits
+       just beyond it and comes back as soon as the remote turns back. (1.1.3 let it go anywhere, and a real remote's
+       pointer drifted away out of reach.) */
+    const float limit_x = HALF_WIDTH_DEGREES * 2.5f, limit_y = HALF_HEIGHT_DEGREES * 2.5f;
+    if (mp.yaw > limit_x) mp.yaw = limit_x;
+    if (mp.yaw < -limit_x) mp.yaw = -limit_x;
+    if (mp.pitch > limit_y) mp.pitch = limit_y;
+    if (mp.pitch < -limit_y) mp.pitch = -limit_y;
 }
 void motion_pointer_feed(const u8* report_bytes, double seconds) { motion_pointer_feed_at(0, report_bytes, seconds); }
 
@@ -237,8 +243,8 @@ int motion_pointer_tilt_at(int slot, const u16 accel[3], const u8 cal[10], float
     if (!mp.loaded) load_settings(cur_mp);
     float g[3];
     for (int i = 0; i < 3; i++) {
-        float zero = (float)(cal[i] << 2 | ((cal[3] >> (4 - 2 * i)) & 3));
-        float one = (float)(cal[4 + i] << 2 | ((cal[7] >> (4 - 2 * i)) & 3));
+        float zero = cal ? (float)(cal[i] << 2 | ((cal[3] >> (4 - 2 * i)) & 3)) : 0.0f;
+        float one = cal ? (float)(cal[4 + i] << 2 | ((cal[7] >> (4 - 2 * i)) & 3)) : 0.0f;
         if (one - zero < 10.0f) zero = 512.0f, one = 616.0f; /* no calibration: typical values */
         g[i] = ((float)accel[i] - zero) / (one - zero);
         if (g[i] > 1.0f) g[i] = 1.0f;
@@ -253,6 +259,29 @@ int motion_pointer_tilt_at(int slot, const u16 accel[3], const u8 cal[10], float
     *y = tilt_y[s];
     return fabsf(*x) < ON_SCREEN && fabsf(*y) < ON_SCREEN;
 }
+
+/* The pointer for a real remote's report when no sensor bar is seen: the MotionPlus one while MotionPlus data comes
+   in and its zero is known, else the tilt one. Wii Party and Mario Party 9 never switch MotionPlus on and a plain
+   remote has none, so with only the MotionPlus pointer those had no pointer at all but the mouse. */
+static void report_accel(const u8* r, u16 accel[3]) {
+    accel[0] = (u16)(r[3] << 2 | ((r[1] >> 5) & 3));
+    accel[1] = (u16)(r[4] << 2 | ((r[2] >> 5) & 1) << 1);
+    accel[2] = (u16)(r[5] << 2 | ((r[2] >> 6) & 1) << 1);
+}
+
+int motion_pointer_for_report_at(int slot, const u8* r, float* x, float* y) {
+    u16 accel[3];
+    {
+        SLOT(slot);
+        if (mp.samples && mp.reports - mp.gyro_report < GYRO_GONE_REPORTS && mp.zero_known)
+            return motion_pointer_get_at(slot, x, y);
+    }
+    if (!accel_of(r)) return 0;
+    report_accel(r, accel);
+    return motion_pointer_tilt_at(slot, accel, NULL, x, y); /* typical calibration */
+}
+
+int motion_pointer_for_report(const u8* r, float* x, float* y) { return motion_pointer_for_report_at(0, r, x, y); }
 
 int motion_pointer_get_at(int slot, float* x, float* y) {
     SLOT(slot);
@@ -510,18 +539,18 @@ int motion_pointer_self_test(void) {
            mp.zero[1], mp.zero[2], test_zero[0], test_zero[1], test_zero[2], x - x0, y - y0);
     if (fabsf(mp.zero[0] - test_zero[0]) > 10.0f || fabsf(x - x0) > 0.01f || fabsf(y - y0) > 0.01f) failures++;
 
-    /* Turned far round and back: the pointer comes back to the middle, as the remote did. */
+    /* Turned well off the screen (within the limit) and back: the pointer comes back to the middle, as the remote did. */
     reset_for_test(GYRO_ZERO, GYRO_ZERO, GYRO_ZERO);
     for (int i = 0; i < 300; i++) {
         make_report(r, 0, 0, 0, (i % 3) - 1);
         feed(r, 0.005);
     }
-    for (int i = 0; i < 400; i++) { /* 60 degrees right, then back */
-        make_report(r, i < 200 ? -60.0f : 60.0f, 0, 0, 0);
+    for (int i = 0; i < 400; i++) { /* 40 degrees right, then back */
+        make_report(r, i < 200 ? -40.0f : 40.0f, 0, 0, 0);
         feed(r, 0.005);
     }
     int back = motion_pointer_get(&x, &y);
-    printf("turned 60 degrees away and back: pointer %.3f, on screen %d\n", x, back);
+    printf("turned 40 degrees away and back: pointer %.3f, on screen %d\n", x, back);
     if (!back || fabsf(x) > 0.05f) failures++;
     /* Rolled onto its side, its dots go (the game would read them as the remote held level), and come back. */
     for (int i = 0; i < 60; i++) {
@@ -538,6 +567,42 @@ int motion_pointer_self_test(void) {
     int level_on = motion_pointer_get(&x, &y);
     printf("rolled onto its side: on screen %d; level again: %d\n", rolled_on, level_on);
     if (rolled_on || !level_on) failures++;
+
+    /* Reports with no MotionPlus data (a game that leaves it off, or a remote without one): the tilt pointer. */
+    reset_for_test(GYRO_ZERO, GYRO_ZERO, GYRO_ZERO);
+    int tilt_on = 0;
+    for (int i = 0; i < 40; i++) { /* mode 0x33: buttons, accelerometer and IR, tipped up about 20 degrees */
+        memset(r, 0, 22);
+        r[0] = 0x33;
+        r[3] = 128;
+        r[4] = 128 + 9;
+        r[5] = 128 + 24;
+        memset(r + 6, 0xFF, 12);
+        feed(r, 0.005);
+        tilt_on = motion_pointer_for_report(r, &x, &y);
+    }
+    printf("no MotionPlus, tipped up: tilt pointer %.3f %.3f, on screen %d\n", x, y, tilt_on);
+    if (!tilt_on || fabsf(x) > 0.05f || y > -0.5f) failures++;
+    /* MotionPlus data held still: once its zero is learned, its pointer takes over, in the middle. */
+    for (int i = 0; i < 300; i++) {
+        make_report(r, 0, 0, 0, (i % 3) - 1);
+        feed(r, 0.005);
+    }
+    int gyro_on = motion_pointer_for_report(r, &x, &y);
+    printf("MotionPlus again: pointer %.3f %.3f, on screen %d\n", x, y, gyro_on);
+    if (!gyro_on || fabsf(x) > 0.02f || fabsf(y) > 0.02f) failures++;
+    /* Turned well past the edge and held there for a long time: it comes back as soon as the remote turns back. */
+    for (int i = 0; i < 600; i++) {
+        make_report(r, -120.0f, 0, 0, 0);
+        feed(r, 0.005);
+    }
+    for (int i = 0; i < 45; i++) { /* back 27 degrees from where it waits */
+        make_report(r, 120.0f, 0, 0, 0);
+        feed(r, 0.005);
+    }
+    int returned = motion_pointer_get(&x, &y);
+    printf("turned far right for 3 s, then 27 degrees back: pointer %.3f, on screen %d\n", x, returned);
+    if (!returned) failures++;
 
     printf("motion pointer self-test: %d failures\n", failures);
     return failures;
