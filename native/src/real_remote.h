@@ -7,6 +7,7 @@
 #define REAL_REMOTE_SLOTS 4 /* remotes open at once; the functions without _at are slot 0's */
 
 int real_remote_connected_at(int slot);
+int real_remote_is_plus_at(int slot); /* a Wii Remote Plus: MotionPlus built in */
 int real_remote_read_at(int slot, uint8_t* out, double* when);
 void real_remote_write_at(int slot, const uint8_t* data, uint32_t size);
 

@@ -40,6 +40,7 @@ typedef struct {
     volatile LONG connected;
     uint32_t input_size, output_size;
     int use_set_output_report;
+    uint16_t product; /* 0306 a Wii Remote, 0330 a Wii Remote Plus (MotionPlus inside) */
     char path[MAX_PATH_TEXT];
     uint64_t reports_read, reports_written, write_failures, reports_dropped;
 } Slot;
@@ -152,6 +153,7 @@ static int find_remotes(uint32_t* total, int open_into) {
         snprintf(sl->path, sizeof sl->path, "%s", detail->DevicePath);
         sl->incoming.head = sl->incoming.tail = sl->outgoing.head = sl->outgoing.tail = 0;
         sl->use_set_output_report = 0;
+        sl->product = attributes.ProductID;
         LeaveCriticalSection(&lock);
         InterlockedExchange(&sl->connected, 1);
         fprintf(report, "Wii Remote %d: connected, reports %u in, %u out\n", free_slot + 1, sl->input_size,
@@ -351,6 +353,8 @@ typedef uint32_t u32;
    yaw going back and forth on the gyro, and the Nunchuk's stick held right. */
 static int sim_nunchuk, sim_mp_on, sim_mp_mode, sim_streaming, sim_turn;
 static DWORD sim_mp_ready_at; /* a tick count: a MotionPlus just switched on answers reads from then */
+static DWORD sim_a6_ready_at; /* and its switched-off MotionPlus answers at 0xA6 only from then, as some don't at once */
+#define SIM_A6_AFTER_MS 600u
 #define SIM_MP_START_MS 400u
 static u8 sim_leds, sim_mode;
 static CRITICAL_SECTION sim_lock;
@@ -425,7 +429,7 @@ static void sim_ack(u8 id, u8 error) {
 static const u8* sim_region(u32 space, u32 address) {
     u32 device = (address >> 16) & 0xFFu, offset = address & 0xFFu;
     if (space == 0) return (address & 0xFFFFu) < sizeof sim_eeprom ? sim_eeprom + (address & 0xFFFFu) : NULL;
-    if (device == 0xA6 && !sim_mp_on) return sim_mp_off + offset;
+    if (device == 0xA6 && !sim_mp_on) return (LONG)(GetTickCount() - sim_a6_ready_at) < 0 ? NULL : sim_mp_off + offset;
     if (device == 0xA4 && sim_mp_on) {
         if ((LONG)(GetTickCount() - sim_mp_ready_at) < 0) return NULL; /* still coming up: an error, as a real one */
         u8 id[6] = {0x00, 0x00, 0xA4, 0x20, (u8)sim_mp_mode, 0x05};
@@ -555,8 +559,11 @@ void real_remote_start_simulated(int nunchuk) {
     InitializeCriticalSection(&sim_lock);
     start_slots(0);
     sim_setup(nunchuk);
+    sim_a6_ready_at = GetTickCount() + SIM_A6_AFTER_MS;
     simulated = 1;
     slots[0].connected = 1;
     CreateThread(NULL, 0, sim_stream, NULL, 0, NULL);
     fprintf(report, "Wii Remote: simulated, Nunchuk %s\n", nunchuk ? "in" : "out");
 }
+
+int real_remote_is_plus_at(int slot) { return simulated || slot_at(slot)->product == REMOTE_PLUS_PRODUCT; }
